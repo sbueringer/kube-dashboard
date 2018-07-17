@@ -1,0 +1,241 @@
+<mat-grid-list [cols]="4" rowHeight="fit" class="rbac-panel">
+    <mat-grid-tile>
+        <mat-grid-tile-header class="rbac-header">
+            <!-- //TODO Filter box*/ on each select-->
+            <mat-form-field>
+                <mat-select placeholder="Subjects" [multiple]="true" [(value)]="selectedSubjects" (valueChange)="calculateVisibleObjects()" disableOptionCentering="true">
+                    <ngx-mat-select-search placeholderLabel="Filter" noEntriesFoundLabel="No matches found" [formControl]="subjectFilterCtrl">
+                    </ngx-mat-select-search>
+                    <mat-optgroup label="User">
+                        <mat-option *ngFor="let s of filteredUsers | async" [value]="s">
+                        {{s.name}}
+                        </mat-option>
+                    </mat-optgroup>
+                    <mat-optgroup label="Groups">
+                        <mat-option *ngFor="let s of filteredGroups | async " [value]="s">
+                        {{s.name}}
+                        </mat-option>
+                    </mat-optgroup>
+                    <mat-optgroup label="ServiceAccounts">
+                        <mat-option *ngFor="let s of filteredServiceAccounts | async" [value]="s">
+                        {{s.name}}
+                        </mat-option>
+                    </mat-optgroup>
+                </mat-select>
+            </mat-form-field>
+        </mat-grid-tile-header>
+
+        <mat-accordion [multi]="true" class="subjects-panel">
+            <mat-expansion-panel [expanded]="true" [hideToggle]="true" *ngIf="user.length>0"
+                                 class="subjects-expansion-panel">
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        User
+                    </mat-panel-title>
+                    <mat-panel-description class="subjects-icon">
+                        <mat-icon>account_circle</mat-icon>
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-action-row>
+                    <mat-list class="subjects-list">
+                        <mat-list-item *ngFor="let subject of user; last as last">
+                        {{subject.name}}
+                            <mat-divider [inset]="true" *ngIf="!last"></mat-divider>
+                        </mat-list-item>
+                    </mat-list>
+                </mat-action-row>
+            </mat-expansion-panel>
+
+            <mat-expansion-panel [expanded]="true" [hideToggle]="true" *ngIf="groups.length>0"
+                                 class="subjects-expansion-panel">
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        Groups
+                    </mat-panel-title>
+                    <mat-panel-description class="subjects-icon">
+                        <mat-icon>group</mat-icon>
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-action-row>
+                    <mat-list class="subjects-list">
+                        <mat-list-item *ngFor="let subject of groups; last as last">
+                        {{subject.name}}
+                            <mat-divider [inset]="true" *ngIf="!last"></mat-divider>
+                        </mat-list-item>
+                    </mat-list>
+                </mat-action-row>
+            </mat-expansion-panel>
+
+            <mat-expansion-panel [expanded]="true" [hideToggle]="true" *ngIf="serviceAccounts.length>0"
+                                 class="subjects-expansion-panel">
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        ServiceAccounts
+                    </mat-panel-title>
+                    <mat-panel-description class="subjects-icon">
+                        <mat-icon>android</mat-icon>
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-action-row>
+                    <mat-list class="subjects-list">
+                        <mat-list-item *ngFor="let subject of serviceAccounts; last as last">
+                        {{subject.namespace}}:{{subject.name}}
+                            <mat-divider [inset]="true" *ngIf="!last"></mat-divider>
+                        </mat-list-item>
+                    </mat-list>
+                </mat-action-row>
+            </mat-expansion-panel>
+        </mat-accordion>
+
+    </mat-grid-tile>
+    <mat-grid-tile>
+        <mat-grid-tile-header class="rbac-header">
+            <mat-select placeholder="Scopes" [multiple]="true" [(value)]="selectedScopes"
+                        (valueChange)="calculateVisibleObjects()">
+                <mat-optgroup label="Namespace">
+                    <mat-option *ngFor="let n of selectScopes.get('Namespace')" [value]="n">
+                    {{n}}
+                    </mat-option>
+                </mat-optgroup>
+                <mat-optgroup label="Cluster-wide">
+                    <mat-option>
+                        Cluster-wide
+                    </mat-option>
+                </mat-optgroup>
+            </mat-select>
+        </mat-grid-tile-header>
+
+        <mat-accordion [multi]="true" class="scopes-panel">
+            <mat-expansion-panel [expanded]="true" [hideToggle]="true" *ngIf="clusterWide"
+                                 class="scopes-expansion-panel">
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        Cluster-wide
+                    </mat-panel-title>
+                    <mat-panel-description class="scopes-icon">
+                        <mat-icon>fullscreen</mat-icon>
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-action-row>
+                    <mat-list class="scopes-list">
+                        <mat-list-item>
+                            Cluster-wide
+                        </mat-list-item>
+                    </mat-list>
+                </mat-action-row>
+            </mat-expansion-panel>
+
+            <mat-expansion-panel [expanded]="true" [hideToggle]="true" *ngIf="namespaces.length>0"
+                                 class="scopes-expansion-panel">
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        Namespace
+                    </mat-panel-title>
+                    <mat-panel-description class="scopes-icon">
+                        <mat-icon>fullscreen_exit</mat-icon>
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-action-row>
+                    <mat-list class="scopes-list">
+                        <mat-list-item *ngFor="let n of namespaces; last as last">
+                        {{n}}
+                            <mat-divider [inset]="true" *ngIf="!last"></mat-divider>
+                        </mat-list-item>
+                    </mat-list>
+                </mat-action-row>
+            </mat-expansion-panel>
+        </mat-accordion>
+    </mat-grid-tile>
+    <mat-grid-tile>
+        <mat-grid-tile-header class="rbac-header">
+            <mat-select placeholder="Roles" [multiple]="true" [(value)]="selectedRoles"
+                        (valueChange)="calculateVisibleObjects()">
+                <mat-optgroup label="Roles">
+                    <mat-option *ngFor="let r of selectRoles.get('Role')" [value]="r">
+                    {{r.name}}
+                    </mat-option>
+                </mat-optgroup>
+                <mat-optgroup label="ClusterRoles">
+                    <mat-option *ngFor="let cr of selectRoles.get('ClusterRole')" [value]="cr">
+                    {{cr.name}}
+                    </mat-option>
+                </mat-optgroup>
+            </mat-select>
+        </mat-grid-tile-header>
+
+        <mat-accordion [multi]="true" class="roles-panel">
+            <mat-expansion-panel [expanded]="true" [hideToggle]="true" *ngIf="clusterRoles.length>0"
+                                 class="roles-expansion-panel">
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        ClusterRoles
+                    </mat-panel-title>
+                    <mat-panel-description class="roles-icon">
+                        <mat-icon>fullscreen</mat-icon>
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-action-row>
+                    <mat-list class="roles-list">
+                        <mat-list-item *ngFor="let cr of clusterRoles; last as last">
+                        {{cr.name}}
+                            <mat-divider [inset]="true" *ngIf="!last"></mat-divider>
+                        </mat-list-item>
+                    </mat-list>
+                </mat-action-row>
+            </mat-expansion-panel>
+
+            <mat-expansion-panel [expanded]="true" [hideToggle]="true" *ngIf="roles.length>0"
+                                 class="roles-expansion-panel">
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        Roles
+                    </mat-panel-title>
+                    <mat-panel-description class="roles-icon">
+                        <mat-icon>fullscreen_exit</mat-icon>
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-action-row>
+                    <mat-list class="roles-list">
+                        <mat-list-item *ngFor="let r of roles; last as last">
+                        {{r.namespace}}:{{r.name}}
+                            <mat-divider [inset]="true" *ngIf="!last"></mat-divider>
+                        </mat-list-item>
+                    </mat-list>
+                </mat-action-row>
+            </mat-expansion-panel>
+        </mat-accordion>
+    </mat-grid-tile>
+    <mat-grid-tile>
+        <mat-grid-tile-header class="rbac-header">
+            <mat-select placeholder="Rights" [multiple]="true">
+                <mat-optgroup *ngFor="let rg of rights" [label]="rg.scope">
+                    <mat-option *ngFor="let r of rg.rights" [value]="r">
+                    {{r}}
+                    </mat-option>
+                </mat-optgroup>
+            </mat-select>
+        </mat-grid-tile-header>
+
+        <mat-accordion [multi]="true" class="rights-panel">
+            <mat-expansion-panel [expanded]="true" [hideToggle]="true" *ngFor="let rg of rights"
+                                 class="rights-expansion-panel">
+                <mat-expansion-panel-header>
+                    <mat-panel-title>
+                        Rights ({{rg.scope}})
+                    </mat-panel-title>
+                    <mat-panel-description class="rights-icon">
+                        <mat-icon>lock_open</mat-icon>
+                    </mat-panel-description>
+                </mat-expansion-panel-header>
+                <mat-action-row>
+                    <mat-list class="rights-list">
+                        <mat-list-item *ngFor="let r of rg.rights; last as last">
+                        {{r}}
+                            <mat-divider [inset]="true" *ngIf="!last"></mat-divider>
+                        </mat-list-item>
+                    </mat-list>
+                </mat-action-row>
+            </mat-expansion-panel>
+        </mat-accordion>
+    </mat-grid-tile>
+</mat-grid-list>

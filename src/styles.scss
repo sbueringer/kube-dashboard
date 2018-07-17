@@ -1,0 +1,9 @@
+/* You can add global styles to this file, and also import other style files */
+
+@import '~@angular/material/theming';
+
+@include mat-core();
+
+@import 'default-theme.scss';
+
+@include angular-material-theme($default-theme);
