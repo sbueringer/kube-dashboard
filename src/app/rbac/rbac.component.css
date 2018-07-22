@@ -28,23 +28,23 @@
     width: 100%;
 }
 
-/*scopes*/
+/*rolebindings*/
 
-.scopes-panel {
+.rolebindings-panel {
     padding: 85px 5px 5px;
     align-self: flex-start;
     width: 100%;
 }
 
-/deep/ .scopes-expansion-panel .mat-expansion-panel-body {
+/deep/ .rolebindings-expansion-panel .mat-expansion-panel-body {
     padding: 0;
 }
 
-.scopes-icon{
+.rolebindings-icon{
     justify-content: flex-end;
 }
 
-.scopes-list{
+.rolebindings-list{
     width: 100%;
 }
 
@@ -68,23 +68,23 @@
     width: 100%;
 }
 
-/*Rights*/
+/*Rules*/
 
-.rights-panel {
+.rules-panel {
     padding: 85px 5px 5px;
     align-self: flex-start;
     width: 100%;
 }
 
-/deep/ .rights-expansion-panel .mat-expansion-panel-body {
+/deep/ .rules-expansion-panel .mat-expansion-panel-body {
     padding: 0;
 }
 
-.rights-icon{
+.rules-icon{
     justify-content: flex-end;
 }
 
-.rights-list{
+.rules-list{
     width: 100%;
 }
 

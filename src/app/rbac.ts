@@ -1,13 +1,18 @@
 
+
 export class RBAC{
-    subjects: Subject[];
-    roles: Role[];
-    bindings: Binding[];
+    mappings: Mapping [];
+    subjects: Map<String,Subject>;
+    roleBindings: Map<String,RoleBinding>;
+    roles: Map<String,Role>;
+    rules: Map<String,Rule>;
 }
 
-export class SubjectGroup{
-    name: string;
-    subjects: Subject[];
+export class Mapping{
+    subjectID: string;
+    roleBindingID: string;
+    roleID: string;
+    ruleID: string;
 }
 
 export class Subject{
@@ -18,35 +23,37 @@ export class Subject{
     apiGroup: string;
 }
 
-export class Role{
-    id: string;
-    name: string;
-    namespace: string;
-    kind: string;
-    rules: Rule[];
-}
-
-export class Rule{
-    apiGroups: string[];
-    resources: string[];
-    verbs: string[];
-}
-
-export class Right {
-    resource: string;
-    verbs: string[];
-}
-
-export class RightGroup {
-    scope: string;
-    rights: String[];
-}
-
-export class Binding{
+export class RoleBinding{
     id: string;
     name: string;
     kind: string;
     namespace: string;
     roleRef: string;
     subjects: string[];
+}
+
+export class Role{
+    id: string;
+    name: string;
+    namespace: string;
+    kind: string;
+}
+
+export class Rule{
+    id: string;
+    display: string;
+    apiGroup: string;
+    resource: string;
+    resourceName: string;
+    verbs: string[];
+}
+
+export class NamespacedRoleBindingRule{
+    namespace: string;
+    roleRules: RoleBindingRule[];
+}
+
+export class RoleBindingRule{
+    roleBinding: RoleBinding;
+    rule: Rule;
 }

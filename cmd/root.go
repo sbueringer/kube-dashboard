@@ -53,10 +53,20 @@ var rootCmd = &cobra.Command{
 }
 
 type rbac struct {
-	Subjects []subject `json:"subjects"`
-	Roles    []role    `json:"roles"`
-	Bindings []binding `json:"bindings"`
+	Mappings     []mapping              `json:"mappings"`
+	Subjects     map[string]subject     `json:"subjects"`
+	RoleBindings map[string]roleBinding `json:"roleBindings"`
+	Roles        map[string]role        `json:"roles"`
+	Rules        map[string]rule        `json:"rules"`
 }
+
+type mapping struct {
+	SubjectID     string `json:"subjectID"`
+	RoleBindingID string `json:"roleBindingID"`
+	RoleID        string `json:"roleID"`
+	RuleID        string `json:"ruleID"`
+}
+
 type subject struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -65,21 +75,7 @@ type subject struct {
 	ApiGroup  string `json:"apiGroup"`
 }
 
-type rule struct {
-	ApiGroups []string `json:"apiGroups"`
-	Resources []string `json:"resources"`
-	Verbs     []string `json:"verbs"`
-}
-
-type role struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Kind      string `json:"kind"`
-	Namespace string `json:"namespace"`
-	Rules     []rule `json:"rules"`
-}
-
-type binding struct {
+type roleBinding struct {
 	ID        string   `json:"id"`
 	Name      string   `json:"name"`
 	Kind      string   `json:"kind"`
@@ -88,68 +84,218 @@ type binding struct {
 	Subjects  []string `json:"subjects"`
 }
 
+type role struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Kind      string `json:"kind"`
+	Namespace string `json:"namespace"`
+}
+
+type rule struct {
+	ID           string   `json:"id"`
+	ApiGroup     string   `json:"apiGroup"`
+	Resource     string   `json:"resource"`
+	ResourceName string   `json:"resourceName"`
+	Verbs        []string `json:"verbs"`
+}
+
+var clusterWideIdentifier = "ClusterWide"
+
 func startServer() func(cmd *cobra.Command, args []string) {
 	return func(cmd *cobra.Command, args []string) {
 		createAndRunInformers()
 
 		mux := http.NewServeMux()
+
 		mux.Handle("/api", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			rbac := &rbac{}
-
-			addedSubjects := make(map[string]bool)
-
-			for _, entry := range clusterRoleBindingStore.List() {
-				if crb, ok := entry.(*v1.ClusterRoleBinding); ok {
-					var crbSubjects []string
-					for _, sub := range crb.Subjects {
-						id := sub.Kind + ":" + sub.Namespace + ":" + sub.Name
-						if !addedSubjects[id] {
-							rbac.Subjects = append(rbac.Subjects, subject{id, sub.Name, sub.Kind, sub.Namespace, sub.APIGroup})
-							crbSubjects = append(crbSubjects, id)
-							addedSubjects[id] = true
-						}
-					}
-					id := "ClusterRoleBinding" + ":" + crb.Namespace + ":" + crb.Name
-					roleRefID := crb.RoleRef.Kind + ":" + crb.Namespace + ":" + crb.RoleRef.Name
-					rbac.Bindings = append(rbac.Bindings, binding{id, crb.Name, "ClusterRoleBinding", crb.Namespace, roleRefID, crbSubjects})
-				}
+			rbac := &rbac{
+				Roles:        make(map[string]role),
+				Subjects:     make(map[string]subject),
+				RoleBindings: make(map[string]roleBinding),
+				Rules:        make(map[string]rule),
 			}
-			for _, entry := range roleBindingStore.List() {
-				if rb, ok := entry.(*v1.RoleBinding); ok {
-					var rbSubjects []string
-					for _, sub := range rb.Subjects {
-						id := sub.Kind + ":" + sub.Namespace + ":" + sub.Name
-						if !addedSubjects[id] {
-							rbac.Subjects = append(rbac.Subjects, subject{id, sub.Name, sub.Kind, sub.Namespace, sub.APIGroup})
-							rbSubjects = append(rbSubjects, id)
-							addedSubjects[id] = true
-						}
-					}
-					id := "RoleBinding" + ":" + rb.Namespace + ":" + rb.Name
-					roleRefID := rb.RoleRef.Kind + ":" + rb.Namespace + ":" + rb.RoleRef.Name
-					rbac.Bindings = append(rbac.Bindings, binding{id, rb.Name, "RoleBinding", rb.Namespace, roleRefID, rbSubjects})
-				}
-			}
+
+			roleIDRuleIDs := make(map[string][]string)
 
 			for _, entry := range clusterRoleStore.List() {
-				if cr, ok := entry.(*v1.ClusterRole); ok {
-					id := "ClusterRole" + ":" + cr.Namespace + ":" + cr.Name
-					role := role{id, cr.Name, "ClusterRole", cr.Namespace, []rule{}}
-					for _, r := range cr.Rules {
-						role.Rules = append(role.Rules, rule{r.APIGroups, r.Resources, r.Verbs})
+				if r, ok := entry.(*v1.ClusterRole); ok {
+					roleID := calculateID(r)
+					role := role{roleID, r.Name, "ClusterRole", clusterWideIdentifier}
+					rbac.Roles[roleID] = role
+
+					for _, ru := range r.Rules {
+						for _, apiGroup := range ru.APIGroups {
+							for _, resource := range ru.Resources { //TODO resourcenames
+								if len(ru.ResourceNames) > 0 {
+									for _, resourceName := range ru.ResourceNames {
+										ruleID := fmt.Sprintf("%s|%s|%s|%s", apiGroup, resource, resourceName, ru.Verbs)
+										rbac.Rules[ruleID] = rule{
+											ID:           ruleID,
+											ApiGroup:     apiGroup,
+											Resource:     resource,
+											ResourceName: resourceName,
+											Verbs:        ru.Verbs,
+										}
+										ruleIDs := roleIDRuleIDs[roleID]
+										if ruleIDs == nil {
+											ruleIDs = []string{}
+										}
+										ruleIDs = append(ruleIDs, ruleID)
+										roleIDRuleIDs[roleID] = ruleIDs
+									}
+								} else {
+									ruleID := fmt.Sprintf("%s|%s|*|%s", apiGroup, resource, ru.Verbs)
+									rbac.Rules[ruleID] = rule{
+										ID:           ruleID,
+										ApiGroup:     apiGroup,
+										Resource:     resource,
+										ResourceName: "",
+										Verbs:        ru.Verbs,
+									}
+									ruleIDs := roleIDRuleIDs[roleID]
+									if ruleIDs == nil {
+										ruleIDs = []string{}
+									}
+									ruleIDs = append(ruleIDs, ruleID)
+									roleIDRuleIDs[roleID] = ruleIDs
+								}
+							}
+						}
 					}
-					rbac.Roles = append(rbac.Roles, role)
+
 				}
 			}
 			for _, entry := range roleStore.List() {
 				if r, ok := entry.(*v1.Role); ok {
-					id := "Role" + ":" + r.Namespace + ":" + r.Name
-					role := role{id, r.Name, "Role", r.Namespace, []rule{}}
-					for _, r := range r.Rules {
-						role.Rules = append(role.Rules, rule{r.APIGroups, r.Resources, r.Verbs})
+					roleID := calculateID(r)
+					role := role{roleID, r.Name, "Role", r.Namespace}
+					rbac.Roles[roleID] = role
+
+					for _, ru := range r.Rules {
+						for _, apiGroup := range ru.APIGroups {
+							for _, resource := range ru.Resources { //TODO resourcenames
+								if len(ru.ResourceNames) > 0 {
+									for _, resourceName := range ru.ResourceNames {
+										ruleID := fmt.Sprintf("%s|%s|%s|%s", apiGroup, resource, resourceName, ru.Verbs)
+										rbac.Rules[ruleID] = rule{
+											ID:           ruleID,
+											ApiGroup:     apiGroup,
+											Resource:     resource,
+											ResourceName: resourceName,
+											Verbs:        ru.Verbs,
+										}
+										ruleIDs := roleIDRuleIDs[roleID]
+										if ruleIDs == nil {
+											ruleIDs = []string{}
+										}
+										ruleIDs = append(ruleIDs, ruleID)
+										roleIDRuleIDs[roleID] = ruleIDs
+									}
+								} else {
+									ruleID := fmt.Sprintf("%s|%s|*|%s", apiGroup, resource, ru.Verbs)
+									rbac.Rules[ruleID] = rule{
+										ID:           ruleID,
+										ApiGroup:     apiGroup,
+										Resource:     resource,
+										ResourceName: "",
+										Verbs:        ru.Verbs,
+									}
+									ruleIDs := roleIDRuleIDs[roleID]
+									if ruleIDs == nil {
+										ruleIDs = []string{}
+									}
+									ruleIDs = append(ruleIDs, ruleID)
+									roleIDRuleIDs[roleID] = ruleIDs
+								}
+							}
+						}
 					}
-					rbac.Roles = append(rbac.Roles, role)
+				}
+			}
+
+			for _, entry := range clusterRoleBindingStore.List() {
+				if crb, ok := entry.(*v1.ClusterRoleBinding); ok {
+					crbID := calculateID(crb)
+					roleID := calculateIDNamespace(&crb.RoleRef, clusterWideIdentifier)
+					var subIds []string
+					for _, sub := range crb.Subjects {
+						subID := calculateID(&sub)
+						subIds = append(subIds, subID)
+						if _, ok := rbac.Subjects[subID]; !ok {
+							ns := sub.Namespace
+							if ns == "" {
+								ns = clusterWideIdentifier
+							}
+							rbac.Subjects[subID] = subject{
+								ID:        subID,
+								Name:      sub.Name,
+								Namespace: ns,
+								Kind:      sub.Kind,
+								ApiGroup:  sub.APIGroup,
+							}
+						}
+						if ruleIDs, ok := roleIDRuleIDs[roleID]; ok {
+							for _, ruleID := range ruleIDs {
+								rbac.Mappings = append(rbac.Mappings, mapping{
+									SubjectID:     subID,
+									RoleBindingID: crbID,
+									RoleID:        roleID,
+									RuleID:        ruleID,
+								})
+							}
+						}
+					}
+					rbac.RoleBindings[crbID] = roleBinding{
+						ID:        crbID,
+						Name:      crb.Name,
+						Namespace: crb.Namespace,
+						Kind:      "ClusterRoleBinding",
+						RoleRef:   roleID,
+						Subjects:  subIds,
+					}
+				}
+			}
+			for _, entry := range roleBindingStore.List() {
+				if rb, ok := entry.(*v1.RoleBinding); ok {
+					rbID := calculateID(rb)
+					roleID := calculateIDNamespace(&rb.RoleRef, rb.Namespace)
+					var subIds []string
+					for _, sub := range rb.Subjects {
+						subID := calculateID(&sub)
+						subIds = append(subIds, subID)
+						if _, ok := rbac.Subjects[subID]; !ok {
+							ns := sub.Namespace
+							if ns == "" {
+								ns = clusterWideIdentifier
+							}
+							rbac.Subjects[subID] = subject{
+								ID:        subID,
+								Name:      sub.Name,
+								Namespace: ns,
+								Kind:      sub.Kind,
+								ApiGroup:  sub.APIGroup,
+							}
+						}
+						if ruleIDs, ok := roleIDRuleIDs[roleID]; ok {
+							for _, ruleID := range ruleIDs {
+								rbac.Mappings = append(rbac.Mappings, mapping{
+									SubjectID:     subID,
+									RoleBindingID: rbID,
+									RoleID:        roleID,
+									RuleID:        ruleID,
+								})
+							}
+						}
+					}
+					rbac.RoleBindings[rbID] = roleBinding{
+						ID:        rbID,
+						Name:      rb.Name,
+						Namespace: rb.Namespace,
+						Kind:      "RoleBinding",
+						RoleRef:   roleID,
+						Subjects:  subIds,
+					}
 				}
 			}
 
@@ -159,15 +305,17 @@ func startServer() func(cmd *cobra.Command, args []string) {
 			}
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Write(body)
-			//fmt.Fprintf(w, "%v", clusterRoleStore.List())
 		}))
+
 		// current Angular build folder
 		//files := http.FileServer(http.Dir("/home/fedora/code/gopath/src/github.com/sbueringer/kube-dashboard/dist/kube-dashboard"))
 		// statik folder
 		statikFs, err := fs.New()
 		files := http.FileServer(statikFs)
 
-		if err != nil { panic(err) }
+		if err != nil {
+			panic(err)
+		}
 		mux.Handle("/", files)
 
 		log.Print("Listening on :8080")
@@ -175,6 +323,38 @@ func startServer() func(cmd *cobra.Command, args []string) {
 			log.Fatalf("http.ListenAndServe failed %v", err)
 		}
 	}
+}
+
+func calculateID(entry interface{}) string {
+	if r, ok := entry.(*v1.Role); ok {
+		return "Role" + "|" + r.Namespace + "|" + r.Name
+	}
+	if cr, ok := entry.(*v1.ClusterRole); ok {
+		return "ClusterRole" + "|" + clusterWideIdentifier + "|" + cr.Name
+	}
+	if rb, ok := entry.(*v1.RoleBinding); ok {
+		return "RoleBinding" + "|" + rb.Namespace + "|" + rb.Name
+	}
+	if crb, ok := entry.(*v1.ClusterRoleBinding); ok {
+		return "ClusterRoleBinding" + "|" + clusterWideIdentifier + "|" + crb.Name
+	}
+	if sub, ok := entry.(*v1.Subject); ok {
+		if sub.Namespace == "" {
+			return sub.Kind + "|" + clusterWideIdentifier + "|" + sub.Name
+		}
+		return sub.Kind + "|" + sub.Namespace + "|" + sub.Name
+	}
+	return "Unknown type: couldn't calculate ID"
+}
+
+func calculateIDNamespace(entry interface{}, ns string) string {
+	if r, ok := entry.(*v1.RoleRef); ok {
+		if ns == "" {
+			return r.Kind + "|" + clusterWideIdentifier + "|" + r.Name
+		}
+		return r.Kind + "|" + ns + "|" + r.Name
+	}
+	return "Unknown type: couldn't calculate ID"
 }
 
 func createAndRunInformers() {
@@ -220,9 +400,9 @@ func createAndRunInformer(globalStore *cache.Store, listFunc func(lo metav1.List
 		objType,
 		300*time.Second,
 		cache.ResourceEventHandlerFuncs{},
-			//AddFunc: func(obj interface{}) {
-			//	log.Printf("%v\n", obj)
-			//}},
+		//AddFunc: func(obj interface{}) {
+		//	log.Printf("%v\n", obj)
+		//}},
 	)
 	*globalStore = store
 	go controller.Run(wait.NeverStop)
@@ -246,7 +426,7 @@ func initKubeCfg() {
 	var config *rest.Config
 	var err error
 
-	if kubeContext != ""{
+	if kubeContext != "" {
 		config, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 			&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigFile},
 			&clientcmd.ConfigOverrides{CurrentContext: kubeContext}).ClientConfig()

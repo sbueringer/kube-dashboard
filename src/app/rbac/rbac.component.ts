@@ -1,10 +1,9 @@
 import {Component, OnInit} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
-import {Binding, RBAC, RightGroup, Role, Subject} from "../rbac";
-import {RbacService} from "../rbac.service";
-import {FormControl} from "@angular/forms";
-import {ReplaySubject} from "rxjs/index";
-import {takeUntil} from "rxjs/internal/operators";
+import {Mapping, NamespacedRoleBindingRule, RBAC, Role, RoleBinding, RoleBindingRule, Subject} from '../rbac';
+import {RbacService} from '../rbac.service';
+import {FormControl} from '@angular/forms';
+import {ReplaySubject} from 'rxjs/index';
 
 @Component({
     selector: 'app-rbac',
@@ -14,211 +13,335 @@ import {takeUntil} from "rxjs/internal/operators";
 export class RbacComponent implements OnInit {
     private rbac: RBAC;
 
+
+    // Subjects
     private selectedSubjects: Subject[] = [];
-    private selectedSubjectsIds: string[] = [];
+
     private selectSubjects: Map<string, Array<Subject>> = new Map();
     private subjectFilterCtrl: FormControl = new FormControl();
 
-    filterSubjects(){
-        if(!this.selectSubjects){
-            return;
-        }
-        let search = this.subjectFilterCtrl.value;
-        if (!search){
-            this.filteredUsers.next(this.selectSubjects.get("User"));
-            this.filteredGroups.next(this.selectSubjects.get("Group"));
-            this.filteredServiceAccounts.next(this.selectSubjects.get("ServiceAccount"));
-        } else {
-            search = search.toLowerCase();
-        }
-        this.filteredUsers.next(this.selectSubjects.get("User").filter(subject => subject.name.toLowerCase().indexOf(search) > -1));
-        this.filteredGroups.next(this.selectSubjects.get("Group").filter(subject => subject.name.toLowerCase().indexOf(search) > -1));
-        this.filteredServiceAccounts.next(this.selectSubjects.get("ServiceAccount").filter(subject => subject.name.toLowerCase().indexOf(search) > -1));
-    }
-    private user: Subject[] = [];
-    public filteredUsers: ReplaySubject<Subject[]> = new ReplaySubject<Subject[]>(1);
-    private groups: Subject[] = [];
-    public filteredGroups: ReplaySubject<Subject[]> = new ReplaySubject<Subject[]>(1);
-    private serviceAccounts: Subject[] = [];
-    public filteredServiceAccounts: ReplaySubject<Subject[]> = new ReplaySubject<Subject[]>(1);
+    public selectFilteredUsers: ReplaySubject<Subject[]> = new ReplaySubject<Subject[]>(1);
+    public selectFilteredGroups: ReplaySubject<Subject[]> = new ReplaySubject<Subject[]>(1);
+    public selectFilteredServiceAccounts: ReplaySubject<Subject[]> = new ReplaySubject<Subject[]>(1);
 
-    private selectedScopes: string[] = [];
-    private selectScopes: Map<string, Array<string>> = new Map();
-    private namespaces: string[] = [];
-    private clusterWide: string = null;
+    private visibleUsers: Subject[] = [];
+    private visibleGroups: Subject[] = [];
+    private visibleServiceAccounts: Subject[] = [];
 
+
+    // RoleBindings
+    private selectedRoleBindings: RoleBinding[] = [];
+
+    private selectRoleBindings: Map<string, Array<RoleBinding>> = new Map();
+    private roleBindingFilterCtrl: FormControl = new FormControl();
+
+    public selectFilteredRoleBindings: ReplaySubject<RoleBinding[]> = new ReplaySubject<RoleBinding[]>(1);
+    public selectFilteredClusterRoleBindings: ReplaySubject<RoleBinding[]> = new ReplaySubject<RoleBinding[]>(1);
+
+    private visibleRoleBindings: RoleBinding[] = [];
+    private visibleClusterRoleBindings: RoleBinding[] = [];
+
+
+    // Roles
     private selectedRoles: Role[] = [];
+
     private selectRoles: Map<string, Array<Role>> = new Map();
-    private roles: Role[] = [];
-    private clusterRoles: Role[] = [];
+    private roleFilterCtrl: FormControl = new FormControl();
 
-    private bindings: Binding[] = [];
-    private matchedBindings: Binding[] = [];
+    public selectFilteredRoles: ReplaySubject<Role[]> = new ReplaySubject<Role[]>(1);
+    public selectFilteredClusterRoles: ReplaySubject<Role[]> = new ReplaySubject<Role[]>(1);
 
-    private bindingsByRoleRef: Map<string, Array<Binding>> = new Map();
-    private rolesByRoleRef: Map<string, Role> = new Map();
+    private visibleRoles: Role[] = [];
+    private visibleClusterRoles: Role[] = [];
 
-    private rights: RightGroup[] = [];
+
+    // Rules
+    private selectedRoleBindingRule: RoleBindingRule[] = [];
+
+    private selectNamespacedRoleBindingRules: NamespacedRoleBindingRule[] = [];
+    private roleBindingRuleFilterCtrl: FormControl = new FormControl();
+
+    public selectFilteredNamespacesRoleBindingRules: ReplaySubject<NamespacedRoleBindingRule[]> = new ReplaySubject<NamespacedRoleBindingRule[]>(1);
+
+    private visibleNamespacedRoleBindingRules: NamespacedRoleBindingRule[] = [];
+
 
     constructor(
         private route: ActivatedRoute,
         private rbacService: RbacService
     ) {
+
         this.subjectFilterCtrl.valueChanges.subscribe(() => this.filterSubjects());
+        this.roleFilterCtrl.valueChanges.subscribe(() => this.filterRoles());
+        this.roleBindingFilterCtrl.valueChanges.subscribe(() => this.filterRoleBindings());
+        this.roleBindingRuleFilterCtrl.valueChanges.subscribe(() => this.filterRules());
+
+
         this.rbacService.getRBAC().subscribe(newRBAC => {
             this.rbac = newRBAC;
 
+
+            let newSubjectArray = Object.values(newRBAC.subjects);
             this.selectSubjects = new Map();
-            this.selectSubjects.set("User", newRBAC.subjects.filter(sub => sub.kind == "User"));
-            this.selectSubjects.set("Group", newRBAC.subjects.filter(sub => sub.kind == "Group"));
-            this.selectSubjects.set("ServiceAccount", newRBAC.subjects.filter(sub => sub.kind == "ServiceAccount"));
-            this.filteredUsers.next(this.selectSubjects.get("User"));
-            this.filteredGroups.next(this.selectSubjects.get("Group"));
-            this.filteredServiceAccounts.next(this.selectSubjects.get("ServiceAccount"));
+            this.selectSubjects.set('User', newSubjectArray.filter(sub => sub.kind == 'User'));
+            this.selectSubjects.set('Group', newSubjectArray.filter(sub => sub.kind == 'Group'));
+            this.selectSubjects.set('ServiceAccount', newSubjectArray.filter(sub => sub.kind == 'ServiceAccount'));
 
+            this.selectFilteredUsers.next(this.selectSubjects.get('User'));
+            this.selectFilteredGroups.next(this.selectSubjects.get('Group'));
+            this.selectFilteredServiceAccounts.next(this.selectSubjects.get('ServiceAccount'));
+
+
+            let newRoleBindingsArray = Object.values(newRBAC.roleBindings);
+            this.selectRoleBindings = new Map();
+            this.selectRoleBindings.set('RoleBinding', newRoleBindingsArray.filter(roleBinding => roleBinding.kind == 'RoleBinding'));
+            this.selectRoleBindings.set('ClusterRoleBinding', newRoleBindingsArray.filter(roleBinding => roleBinding.kind == 'ClusterRoleBinding'));
+
+            this.selectFilteredRoleBindings.next(this.selectRoleBindings.get('RoleBinding'));
+            this.selectFilteredClusterRoleBindings.next(this.selectRoleBindings.get('ClusterRoleBinding'));
+
+
+            let newRolesArray = Object.values(newRBAC.roles);
             this.selectRoles = new Map();
-            this.selectRoles.set("Role", newRBAC.roles.filter(role => role.kind == "Role"));
-            this.selectRoles.set("ClusterRole", newRBAC.roles.filter(role => role.kind == "ClusterRole"));
+            this.selectRoles.set('Role', newRolesArray.filter(role => role.kind == 'Role'));
+            this.selectRoles.set('ClusterRole', newRolesArray.filter(role => role.kind == 'ClusterRole'));
 
-            this.selectScopes = new Map();
-            this.selectScopes.set("Namespace", Array.from(new Set(this.rbac.bindings
-                .filter(roleBinding => roleBinding.kind == "RoleBinding")
-                .map(roleBinding => roleBinding.namespace))));
-            this.selectScopes.set("Cluster-wide", ["Cluster-wide"]);
+            this.selectFilteredRoles.next(this.selectRoles.get('Role'));
+            this.selectFilteredClusterRoles.next(this.selectRoles.get('ClusterRole'));
 
-            this.bindings = this.rbac.bindings;
-            for (let b of this.bindings) {
-                let tmpBindings = this.bindingsByRoleRef.get(b.roleRef);
-                if (!tmpBindings) {
-                    tmpBindings = [];
-                }
-                tmpBindings.push(b);
-                this.bindingsByRoleRef.set(b.roleRef, tmpBindings);
-            }
-            for (let role of newRBAC.roles) {
-                this.rolesByRoleRef.set(role.id, role);
-            }
+
+            // build Map so that NamespacedRoleBindingRules can be build
+            let roleBindingRulesMap = this.convertMappingsToRoleBindingRules(this.rbac.mappings);
+            this.selectNamespacedRoleBindingRules = [];
+            roleBindingRulesMap.forEach((roleBindingRules: RoleBindingRule[], namespace: string) => {
+                this.selectNamespacedRoleBindingRules.push({namespace: namespace, roleRules: roleBindingRules});
+            });
+            this.selectFilteredNamespacesRoleBindingRules.next(this.selectNamespacedRoleBindingRules);
+
+
             this.calculateVisibleObjects();
         });
     }
 
     calculateVisibleObjects() {
-        this.matchedBindings = [];
-        if (this.selectedSubjects.length == 0 && this.selectedScopes.length == 0 && this.selectedRoles.length == 0) {
-            this.user = this.selectSubjects.get("User");
-            this.groups = this.selectSubjects.get("Group");
-            this.serviceAccounts = this.selectSubjects.get("ServiceAccount");
+        if (this.selectedSubjects.length == 0 && this.selectedRoleBindings.length == 0 &&
+            this.selectedRoles.length == 0 && this.selectedRoleBindingRule.length == 0) {
 
-            this.roles = this.selectRoles.get("Role");
-            this.clusterRoles = this.selectRoles.get("ClusterRole");
+            this.visibleUsers = this.selectSubjects.get('User');
+            this.visibleGroups = this.selectSubjects.get('Group');
+            this.visibleServiceAccounts = this.selectSubjects.get('ServiceAccount');
 
-            this.namespaces = Array.from(new Set(this.rbac.bindings
-                .filter(roleBinding => roleBinding.kind == "RoleBinding")
-                .map(roleBinding => roleBinding.namespace)));
-            this.clusterWide = "Cluster-wide";
+            this.visibleRoles = this.selectRoles.get('Role');
+            this.visibleClusterRoles = this.selectRoles.get('ClusterRole');
 
-            this.matchedBindings = this.bindings
+            this.visibleRoleBindings = this.selectRoleBindings.get('RoleBinding');
+            this.visibleClusterRoleBindings = this.selectRoleBindings.get('ClusterRoleBinding');
+
+            this.visibleNamespacedRoleBindingRules = [];
+
+            let roleBindingRulesMap = this.convertMappingsToRoleBindingRules(this.rbac.mappings);
+            roleBindingRulesMap.forEach((roleRules: RoleBindingRule[], ns: string) => {
+                this.visibleNamespacedRoleBindingRules.push({namespace: ns, roleRules: roleRules});
+            });
+
         } else {
-            if (this.selectedSubjects.length > 0) {
-                this.selectedSubjectsIds = this.selectedSubjects.map(s => s.id);
 
-                this.user = this.selectedSubjects.filter(s => s.kind == "User");
-                this.groups = this.selectedSubjects.filter(s => s.kind == "Group");
-                this.serviceAccounts = this.selectedSubjects.filter(s => s.kind == "ServiceAccount");
+            let selectedSubjectsIds = this.selectedSubjects.map(s => s.id);
+            let selectedRoleBindingIds = this.selectedRoleBindings.map(s => s.id);
+            let selectedRoleIds = this.selectedRoles.map(s => s.id);
+            let selectedRuleIds = this.selectedRoleBindingRule.map(s => s.rule.id);
 
+            let filteredMappings = this.rbac.mappings;
 
-                this.roles = this.selectRoles.get("Role")
-                    .filter(role => {
-                        let bindingsForRole = this.bindingsByRoleRef.get(role.id);
-                        if (bindingsForRole) {
-                            let match = false;
-                            for (let b of bindingsForRole) {
-                                if (b.subjects && this.intersection(b.subjects, this.selectedSubjectsIds).length > 0) {
-                                    this.matchedBindings.push(b);
-                                    console.log("Matched binding:" + bindingsForRole);
-                                    match = true;
-                                }
-                            }
-                            return match;
-                        }
-                        return false;
-                    });
-                this.clusterRoles = this.selectRoles.get("ClusterRole")
-                    .filter(role => {
-                        let bindingsForRole = this.bindingsByRoleRef.get(role.id);
-                        if (bindingsForRole) {
-                            let match = false;
-                            for (let b of bindingsForRole) {
-                                if (b.subjects && this.intersection(b.subjects, this.selectedSubjectsIds).length > 0) {
-                                    this.matchedBindings.push(b);
-                                    console.log("Matched binding:" + bindingsForRole);
-                                    match = true;
-                                }
-                            }
-                            return match;
-                        }
-                        return false;
-                    });
-
-                this.namespaces = Array.from(new Set(this.matchedBindings.filter(b => b.kind == "RoleBinding").map(b => b.namespace)));
-                this.clusterWide = this.clusterRoles.length > 0 ? "Cluster-wide" : "";
+            if (selectedSubjectsIds.length > 0) {
+                // filter mappings for subjects (multiple subjects with or)
+                filteredMappings = filteredMappings.filter(m => selectedSubjectsIds.indexOf(m.subjectID) > -1);
             }
-        }
 
-        // calculate rights
-        this.rights = [];
-        let rightsMap: Map<string, Array<string>> = new Map();
-
-        for (let binding of this.matchedBindings) {
-            let role = this.rolesByRoleRef.get(binding.roleRef);
-            for (let rule of role.rules) {
-                if (rule.resources) {
-                    for (let res of rule.resources) {
-
-                        let namespace: string;
-                        if (binding.kind == "RoleBinding") { // RoleBindings bind per namespace (doesn't matter if Role or ClusterRole)
-                            namespace = binding.namespace
-                        } else { // ClusterRoleBindings bind cluster-wide
-                            namespace = "Cluster-wide"
-                        }
-                        let rightsByNamespace = rightsMap.get(namespace);
-                        if (!rightsByNamespace) {
-                            rightsByNamespace = []
-                        }
-                        rightsByNamespace.push(res + ": " + rule.verbs); //TODO rights may be not unique (i.e. redundant) per namespace
-                        rightsMap.set(namespace, rightsByNamespace);
-                    }
-                }
+            if (selectedRoleBindingIds.length > 0) {
+                // filter mappings for rolebindings
+                filteredMappings = filteredMappings.filter(m => selectedRoleBindingIds.indexOf(m.roleBindingID) > -1);
             }
+
+            if (selectedRoleIds.length > 0) {
+                // filter mappings for roles
+                filteredMappings = filteredMappings.filter(m => selectedRoleIds.indexOf(m.roleID) > -1);
+            }
+
+            if (selectedRuleIds.length > 0) {
+                // filter mappings for rules
+                filteredMappings = filteredMappings.filter(m => selectedRuleIds.indexOf(m.ruleID) > -1);
+            }
+
+            let filteredSubjects = filteredMappings.map(m => m.subjectID);
+            let filteredRoleBindings = filteredMappings.map(m => m.roleBindingID);
+            let filteredRoles = filteredMappings.map(m => m.roleID);
+
+
+            this.visibleUsers = this.selectSubjects.get('User').filter(s => filteredSubjects.indexOf(s.id) > -1);
+            this.visibleGroups = this.selectSubjects.get('Group').filter(s => filteredSubjects.indexOf(s.id) > -1);
+            this.visibleServiceAccounts = this.selectSubjects.get('ServiceAccount').filter(s => filteredSubjects.indexOf(s.id) > -1);
+
+
+            this.visibleRoleBindings = this.selectRoleBindings.get('RoleBinding').filter(s => filteredRoleBindings.indexOf(s.id) > -1);
+            this.visibleClusterRoleBindings = this.selectRoleBindings.get('ClusterRoleBinding').filter(s => filteredRoleBindings.indexOf(s.id) > -1);
+
+
+            this.visibleRoles = this.selectRoles.get('Role').filter(s => filteredRoles.indexOf(s.id) > -1);
+            this.visibleClusterRoles = this.selectRoles.get('ClusterRole').filter(s => filteredRoles.indexOf(s.id) > -1);
+
+            this.visibleNamespacedRoleBindingRules = [];
+            let roleBindingRulesMap = this.convertMappingsToRoleBindingRules(filteredMappings);
+            roleBindingRulesMap.forEach((roleRules: RoleBindingRule[], ns: string) => {
+                this.visibleNamespacedRoleBindingRules.push({namespace: ns, roleRules: roleRules});
+            });
         }
-        rightsMap.forEach((rights: string[], scope: string) => {
-            let uniqueRights = Array.from(new Set(rights));
-            this.rights.push({scope: scope, rights: uniqueRights});
-        })
-
-        // Subject => Role/ClusterRoleBinding => Role/ClusterRole
-        // Subject filtered => filters roles and scopes of this roles
-
-        // Scope => Subjects with Scope => Role/ClusterRole in this scope
-
-        // Role/ClusterRole => Role/ClusterRoleBinding => Subjects
-
-
     }
 
-    intersection(array1: string[], array2: string[]): string[] {
-        return array1.filter(value => -1 !== array2.indexOf(value));
+    convertMappingsToRoleBindingRules(mappings: Mapping[]): Map<string, Array<RoleBindingRule>> {
+        let roleBindingsRulesMap = new Map<string, Array<RoleBindingRule>>();
+        mappings.map(m => this.getRoleBindingRule(m.roleBindingID, m.ruleID))
+            .forEach(roleBindingRule => {
+                let namespace = roleBindingRule.roleBinding.namespace;
+                if (!namespace) {
+                    namespace = 'ClusterWide';
+                }
+                let roleRules = roleBindingsRulesMap.get(namespace);
+                if (!roleRules) {
+                    roleRules = [];
+                }
+                roleRules.push(roleBindingRule);
+
+                roleBindingsRulesMap.set(namespace, roleRules);
+            });
+        return roleBindingsRulesMap;
+    }
+
+    getRoleBindingRule(roleBindingID: string, ruleID: string) {
+        let rbr = new RoleBindingRule();
+        rbr.roleBinding = this.rbac.roleBindings[roleBindingID];
+        rbr.rule = this.rbac.rules[ruleID];
+
+        let display = '';
+        if (rbr.rule.apiGroup != '') {
+            display += rbr.rule.apiGroup + '/';
+        }
+        display += rbr.rule.resource;
+        if (rbr.rule.resourceName != '') {
+            display += ':' + rbr.rule.resourceName;
+        }
+        display += ':[' + rbr.rule.verbs + ']';
+        rbr.rule.display = display;
+
+        return rbr;
     }
 
     ngOnInit(): void {
 
     }
 
+    filterSubjects() {
+        if (!this.selectSubjects) {
+            return;
+        }
+        let search = this.subjectFilterCtrl.value;
+        if (!search) {
+            this.selectFilteredUsers.next(this.selectSubjects.get('User'));
+            this.selectFilteredGroups.next(this.selectSubjects.get('Group'));
+            this.selectFilteredServiceAccounts.next(this.selectSubjects.get('ServiceAccount'));
+        } else {
+            search = search.toLowerCase();
+        }
+        this.selectFilteredUsers.next(this.selectSubjects.get('User').filter(subject => {
+            return subject.name.toLowerCase().search(search) > -1;
+        }));
+        this.selectFilteredGroups.next(this.selectSubjects.get('Group').filter(subject => {
+            return subject.name.toLowerCase().search(search) > -1;
+        }));
+        this.selectFilteredServiceAccounts.next(this.selectSubjects.get('ServiceAccount').filter(subject => {
+            return subject.name.toLowerCase().search(search) > -1;
+        }));
+    }
+
+    resetSubjectFilter() {
+        this.selectedSubjects = [];
+        this.calculateVisibleObjects();
+    }
+
+
+    filterRoleBindings() {
+        if (!this.selectRoleBindings) {
+            return;
+        }
+        let search = this.roleBindingFilterCtrl.value;
+        if (!search) {
+            this.selectFilteredRoleBindings.next(this.selectRoleBindings.get('RoleBinding'));
+            this.selectFilteredClusterRoleBindings.next(this.selectRoleBindings.get('ClusterRoleBinding'));
+        } else {
+            search = search.toLowerCase();
+        }
+        this.selectFilteredRoleBindings.next(this.selectRoleBindings.get('RoleBinding').filter(roleBinding => {
+            return roleBinding.name.toLowerCase().search(search) > -1;
+        }));
+        this.selectFilteredClusterRoleBindings.next(this.selectRoleBindings.get('ClusterRoleBinding').filter(roleBinding => {
+            return roleBinding.name.toLowerCase().search(search) > -1;
+        }));
+    }
+
+    resetRoleBindingFilter() {
+        this.selectedRoleBindings = [];
+        this.calculateVisibleObjects();
+    }
+
+
+    filterRoles() {
+        if (!this.selectRoles) {
+            return;
+        }
+        let search = this.roleFilterCtrl.value;
+        if (!search) {
+            this.selectFilteredRoles.next(this.selectRoles.get('Role'));
+            this.selectFilteredClusterRoles.next(this.selectRoles.get('ClusterRole'));
+        } else {
+            search = search.toLowerCase();
+        }
+        this.selectFilteredRoles.next(this.selectRoles.get('Role').filter(role => {
+            return role.name.toLowerCase().search(search) > -1;
+        }));
+        this.selectFilteredClusterRoles.next(this.selectRoles.get('ClusterRole').filter(role => {
+            return role.name.toLowerCase().search(search) > -1;
+        }));
+    }
+
+    resetRoleFilter() {
+        this.selectedRoles = [];
+        this.calculateVisibleObjects();
+    }
+
+    filterRules() {
+        if (!this.selectNamespacedRoleBindingRules) {
+            return;
+        }
+        let search = this.roleBindingRuleFilterCtrl.value;
+        if (!search) {
+            this.selectFilteredNamespacesRoleBindingRules.next(this.selectNamespacedRoleBindingRules);
+        } else {
+            search = search.toLowerCase();
+        }
+        let filteredSelectRules = this.selectNamespacedRoleBindingRules.map(nrr => {
+                let newNRR = new NamespacedRoleBindingRule();
+                newNRR.namespace = nrr.namespace;
+                newNRR.roleRules = nrr.roleRules.filter(roleBindingRule => {
+                    return roleBindingRule.rule.display.toLowerCase().search(search) > -1;
+                });
+                return newNRR;
+            }
+        );
+        this.selectFilteredNamespacesRoleBindingRules.next(filteredSelectRules);
+    }
+
+    resetRuleFilter() {
+        this.selectedRoleBindingRule = [];
+        this.calculateVisibleObjects();
+    }
 }
-
-
-/*
-Copyright 2017-2018 Google Inc. All Rights Reserved.
-Use of this source code is governed by an MIT-style license that
-can be found in the LICENSE file at http://angular.io/license
-*/
