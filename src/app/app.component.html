@@ -1,15 +1,15 @@
-<!--<h1>{{title}}</h1>-->
-<!--<nav>-->
-<!--<a routerLink="/rbac">RBAC</a>-->
-<!--<a routerLink="/priorityclass">PriorityClass</a>-->
-<!--</nav>-->
-
 <div class="app-container" [class.app-is-mobile]="mobileQuery.matches">
     <mat-toolbar color="primary" class="app-toolbar">
         <button mat-icon-button (click)="snav.toggle()">
             <mat-icon>menu</mat-icon>
         </button>
         <h1 class="app-name">Kube Dashboard</h1>
+
+        <span class="spacer"></span>
+
+        <button mat-icon-button (click)="refresh()">
+            <mat-icon aria-label="Reset">refresh</mat-icon>
+        </button>
     </mat-toolbar>
 
     <mat-sidenav-container class="app-sidenav-container"

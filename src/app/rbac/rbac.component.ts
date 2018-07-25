@@ -1,9 +1,10 @@
 import {Component, OnInit} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {Mapping, NamespacedRoleBindingRule, RBAC, Role, RoleBinding, RoleBindingRule, Subject} from '../rbac';
-import {RbacService} from '../rbac.service';
+import {KubeService} from '../kube.service';
 import {FormControl} from '@angular/forms';
 import {ReplaySubject} from 'rxjs/index';
+import {b} from '@angular/core/src/render3';
 
 @Component({
     selector: 'app-rbac',
@@ -68,7 +69,7 @@ export class RbacComponent implements OnInit {
 
     constructor(
         private route: ActivatedRoute,
-        private rbacService: RbacService
+        private kubeService: KubeService
     ) {
 
         this.subjectFilterCtrl.valueChanges.subscribe(() => this.filterSubjects());
@@ -77,51 +78,69 @@ export class RbacComponent implements OnInit {
         this.roleBindingRuleFilterCtrl.valueChanges.subscribe(() => this.filterRules());
 
 
-        this.rbacService.getRBAC().subscribe(newRBAC => {
+        this.refreshRBAC();
+
+        this.kubeService.commandSent$.subscribe( cmd => {
+            if (cmd == "refreshRBAC"){
+                this.refreshRBAC();
+            }
+        })
+    }
+
+    private refreshRBAC() {
+        this.kubeService.getRBAC().subscribe(newRBAC => {
             this.rbac = newRBAC;
 
+            this.handleRBACUpdate();
 
-            let newSubjectArray = Object.values(newRBAC.subjects);
-            this.selectSubjects = new Map();
-            this.selectSubjects.set('User', newSubjectArray.filter(sub => sub.kind == 'User'));
-            this.selectSubjects.set('Group', newSubjectArray.filter(sub => sub.kind == 'Group'));
-            this.selectSubjects.set('ServiceAccount', newSubjectArray.filter(sub => sub.kind == 'ServiceAccount'));
-
-            this.selectFilteredUsers.next(this.selectSubjects.get('User'));
-            this.selectFilteredGroups.next(this.selectSubjects.get('Group'));
-            this.selectFilteredServiceAccounts.next(this.selectSubjects.get('ServiceAccount'));
-
-
-            let newRoleBindingsArray = Object.values(newRBAC.roleBindings);
-            this.selectRoleBindings = new Map();
-            this.selectRoleBindings.set('RoleBinding', newRoleBindingsArray.filter(roleBinding => roleBinding.kind == 'RoleBinding'));
-            this.selectRoleBindings.set('ClusterRoleBinding', newRoleBindingsArray.filter(roleBinding => roleBinding.kind == 'ClusterRoleBinding'));
-
-            this.selectFilteredRoleBindings.next(this.selectRoleBindings.get('RoleBinding'));
-            this.selectFilteredClusterRoleBindings.next(this.selectRoleBindings.get('ClusterRoleBinding'));
-
-
-            let newRolesArray = Object.values(newRBAC.roles);
-            this.selectRoles = new Map();
-            this.selectRoles.set('Role', newRolesArray.filter(role => role.kind == 'Role'));
-            this.selectRoles.set('ClusterRole', newRolesArray.filter(role => role.kind == 'ClusterRole'));
-
-            this.selectFilteredRoles.next(this.selectRoles.get('Role'));
-            this.selectFilteredClusterRoles.next(this.selectRoles.get('ClusterRole'));
-
-
-            // build Map so that NamespacedRoleBindingRules can be build
-            let roleBindingRulesMap = this.convertMappingsToRoleBindingRules(this.rbac.mappings);
-            this.selectNamespacedRoleBindingRules = [];
-            roleBindingRulesMap.forEach((roleBindingRules: RoleBindingRule[], namespace: string) => {
-                this.selectNamespacedRoleBindingRules.push({namespace: namespace, roleRules: roleBindingRules});
-            });
-            this.selectFilteredNamespacesRoleBindingRules.next(this.selectNamespacedRoleBindingRules);
-
-
+            this.selectedSubjects = [];
+            this.selectedRoleBindings = [];
+            this.selectedRoles = [];
+            this.selectedRoleBindingRule = [];
             this.calculateVisibleObjects();
         });
     }
+
+    private handleRBACUpdate() {
+
+        let newSubjectArray = Object.values(this.rbac.subjects);
+        this.selectSubjects = new Map();
+        this.selectSubjects.set('User', newSubjectArray.filter(sub => sub.kind == 'User'));
+        this.selectSubjects.set('Group', newSubjectArray.filter(sub => sub.kind == 'Group'));
+        this.selectSubjects.set('ServiceAccount', newSubjectArray.filter(sub => sub.kind == 'ServiceAccount'));
+
+        this.selectFilteredUsers.next(this.selectSubjects.get('User'));
+        this.selectFilteredGroups.next(this.selectSubjects.get('Group'));
+        this.selectFilteredServiceAccounts.next(this.selectSubjects.get('ServiceAccount'));
+
+
+        let newRoleBindingsArray = Object.values(this.rbac.roleBindings);
+        this.selectRoleBindings = new Map();
+        this.selectRoleBindings.set('RoleBinding', newRoleBindingsArray.filter(roleBinding => roleBinding.kind == 'RoleBinding'));
+        this.selectRoleBindings.set('ClusterRoleBinding', newRoleBindingsArray.filter(roleBinding => roleBinding.kind == 'ClusterRoleBinding'));
+
+        this.selectFilteredRoleBindings.next(this.selectRoleBindings.get('RoleBinding'));
+        this.selectFilteredClusterRoleBindings.next(this.selectRoleBindings.get('ClusterRoleBinding'));
+
+
+        let newRolesArray = Object.values(this.rbac.roles);
+        this.selectRoles = new Map();
+        this.selectRoles.set('Role', newRolesArray.filter(role => role.kind == 'Role'));
+        this.selectRoles.set('ClusterRole', newRolesArray.filter(role => role.kind == 'ClusterRole'));
+
+        this.selectFilteredRoles.next(this.selectRoles.get('Role'));
+        this.selectFilteredClusterRoles.next(this.selectRoles.get('ClusterRole'));
+
+
+        // build Map so that NamespacedRoleBindingRules can be build
+        let roleBindingRulesMap = this.convertMappingsToRoleBindingRules(this.rbac.mappings);
+        this.selectNamespacedRoleBindingRules = [];
+        roleBindingRulesMap.forEach((roleBindingRules: RoleBindingRule[], namespace: string) => {
+            this.selectNamespacedRoleBindingRules.push({namespace: namespace, roleBindingRules: roleBindingRules});
+        });
+        this.selectFilteredNamespacesRoleBindingRules.next(this.selectNamespacedRoleBindingRules);
+    }
+
 
     calculateVisibleObjects() {
         if (this.selectedSubjects.length == 0 && this.selectedRoleBindings.length == 0 &&
@@ -140,8 +159,8 @@ export class RbacComponent implements OnInit {
             this.visibleNamespacedRoleBindingRules = [];
 
             let roleBindingRulesMap = this.convertMappingsToRoleBindingRules(this.rbac.mappings);
-            roleBindingRulesMap.forEach((roleRules: RoleBindingRule[], ns: string) => {
-                this.visibleNamespacedRoleBindingRules.push({namespace: ns, roleRules: roleRules});
+            roleBindingRulesMap.forEach((roleBindingRules: RoleBindingRule[], ns: string) => {
+                this.visibleNamespacedRoleBindingRules.push({namespace: ns, roleBindingRules: roleBindingRules});
             });
 
         } else {
@@ -192,8 +211,8 @@ export class RbacComponent implements OnInit {
 
             this.visibleNamespacedRoleBindingRules = [];
             let roleBindingRulesMap = this.convertMappingsToRoleBindingRules(filteredMappings);
-            roleBindingRulesMap.forEach((roleRules: RoleBindingRule[], ns: string) => {
-                this.visibleNamespacedRoleBindingRules.push({namespace: ns, roleRules: roleRules});
+            roleBindingRulesMap.forEach((roleBindingRules: RoleBindingRule[], ns: string) => {
+                this.visibleNamespacedRoleBindingRules.push({namespace: ns, roleBindingRules: roleBindingRules});
             });
         }
     }
@@ -206,14 +225,19 @@ export class RbacComponent implements OnInit {
                 if (!namespace) {
                     namespace = 'ClusterWide';
                 }
-                let roleRules = roleBindingsRulesMap.get(namespace);
-                if (!roleRules) {
-                    roleRules = [];
+                let roleBindingRules = roleBindingsRulesMap.get(namespace);
+                if (!roleBindingRules) {
+                    roleBindingRules = [];
                 }
-                roleRules.push(roleBindingRule);
+                roleBindingRules.push(roleBindingRule);
 
-                roleBindingsRulesMap.set(namespace, roleRules);
+                roleBindingsRulesMap.set(namespace, roleBindingRules);
             });
+
+        roleBindingsRulesMap.forEach((roleBindingRules: RoleBindingRule[], namespace: string) => {
+            roleBindingsRulesMap.set(namespace, roleBindingRules.sort((a,b)=> a.rule.display.localeCompare(b.rule.display)));
+        });
+
         return roleBindingsRulesMap;
     }
 
@@ -331,7 +355,7 @@ export class RbacComponent implements OnInit {
         let filteredSelectRules = this.selectNamespacedRoleBindingRules.map(nrr => {
                 let newNRR = new NamespacedRoleBindingRule();
                 newNRR.namespace = nrr.namespace;
-                newNRR.roleRules = nrr.roleRules.filter(roleBindingRule => {
+                newNRR.roleBindingRules = nrr.roleBindingRules.filter(roleBindingRule => {
                     return roleBindingRule.rule.display.toLowerCase().search(search) > -1;
                 });
                 return newNRR;

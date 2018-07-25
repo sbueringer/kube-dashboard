@@ -44,7 +44,7 @@ import {
 } from '@angular/material';
 import {BrowserAnimationsModule} from "@angular/platform-browser/animations";
 import {platformBrowserDynamic} from "@angular/platform-browser-dynamic";
-import {PriorityComponent} from "./priority/priority.component";
+import {NetworkPolicyComponent} from "./networkpolicy/network-policy.component";
 import {FlexLayoutModule} from "@angular/flex-layout";
 import {NgxMatSelectSearchModule} from "ngx-mat-select-search";
 import {ReactiveFormsModule} from "@angular/forms";
@@ -108,7 +108,7 @@ export class MaterialModule {}
     declarations: [
         AppComponent,
         RbacComponent,
-        PriorityComponent
+        NetworkPolicyComponent
     ],
     bootstrap: [AppComponent],
     providers: []

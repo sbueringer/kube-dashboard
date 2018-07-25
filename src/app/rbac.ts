@@ -1,5 +1,4 @@
 
-
 export class RBAC{
     mappings: Mapping [];
     subjects: Map<String,Subject>;
@@ -50,7 +49,7 @@ export class Rule{
 
 export class NamespacedRoleBindingRule{
     namespace: string;
-    roleRules: RoleBindingRule[];
+    roleBindingRules: RoleBindingRule[];
 }
 
 export class RoleBindingRule{

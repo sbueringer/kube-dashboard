@@ -35,6 +35,8 @@ import (
 	"encoding/json"
 
 	_ "github.com/sbueringer/kube-dashboard/statik"
+	v12 "k8s.io/api/networking/v1"
+	v13 "k8s.io/api/core/v1"
 )
 
 var kubeConfigFile string
@@ -44,12 +46,19 @@ var clusterRoleStore cache.Store
 var roleStore cache.Store
 var clusterRoleBindingStore cache.Store
 var roleBindingStore cache.Store
+var podStore cache.Store
+var networkPolicyStore cache.Store
 
 var rootCmd = &cobra.Command{
 	Use:   "kube-dashboard",
 	Short: "",
 	Long:  ``,
 	Run:   startServer(),
+}
+
+type netpol struct {
+	Pods            []v13.Pod           `json:"pods"`
+	NetworkPolicies []v12.NetworkPolicy `json:"networkPolicies"`
 }
 
 type rbac struct {
@@ -107,7 +116,30 @@ func startServer() func(cmd *cobra.Command, args []string) {
 
 		mux := http.NewServeMux()
 
-		mux.Handle("/api", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mux.Handle("/api/netpol", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			netpol := &netpol{}
+
+			for _, entry := range podStore.List() {
+				if p, ok := entry.(*v13.Pod); ok {
+					netpol.Pods = append(netpol.Pods, *p)
+				}
+			}
+
+			for _, entry := range networkPolicyStore.List() {
+				if p, ok := entry.(*v12.NetworkPolicy); ok {
+					netpol.NetworkPolicies = append(netpol.NetworkPolicies, *p)
+				}
+			}
+
+			body, err := json.Marshal(netpol)
+			if err != nil {
+				panic(err)
+			}
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Write(body)
+		}))
+
+		mux.Handle("/api/rbac", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 			rbac := &rbac{
 				Roles:        make(map[string]role),
@@ -389,6 +421,22 @@ func createAndRunInformers() {
 			lo.Watch = true
 			return clientset.RbacV1().RoleBindings("").Watch(lo)
 		}, &v1.RoleBinding{})
+
+	createAndRunInformer(&podStore,
+		func(lo metav1.ListOptions) (runtime.Object, error) {
+			return clientset.CoreV1().Pods("").List(lo)
+		}, func(lo metav1.ListOptions) (watch.Interface, error) {
+			lo.Watch = true
+			return clientset.CoreV1().Pods("").Watch(lo)
+		}, &v13.Pod{})
+
+	createAndRunInformer(&networkPolicyStore,
+		func(lo metav1.ListOptions) (runtime.Object, error) {
+			return clientset.NetworkingV1().NetworkPolicies("").List(lo)
+		}, func(lo metav1.ListOptions) (watch.Interface, error) {
+			lo.Watch = true
+			return clientset.NetworkingV1().NetworkPolicies("").Watch(lo)
+		}, &v12.NetworkPolicy{})
 }
 
 func createAndRunInformer(globalStore *cache.Store, listFunc func(lo metav1.ListOptions) (runtime.Object, error), watchFunc func(lo metav1.ListOptions) (watch.Interface, error), objType runtime.Object) {

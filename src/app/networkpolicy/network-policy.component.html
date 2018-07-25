@@ -1,0 +1,17 @@
+<div class="namespace-container">
+    <mat-button-toggle-group name="fontStyle" aria-label="Font Style" [multiple]="true" (valueChange)="updateFiltering()" [(value)]="selectedNamespaces" >
+        <mat-button-toggle class="card" *ngFor="let ns of allNamespaces" [value]="ns">{{ns}}</mat-button-toggle>
+    </mat-button-toggle-group>
+</div>
+
+<div class="pod-container">
+    <mat-button-toggle-group name="fontStyle" aria-label="Font Style" [multiple]="true" (valueChange)="updateFiltering()" [(value)]="selectedPods" >
+        <mat-button-toggle class="card" *ngFor="let p of filteredPods" [value]="p">{{p.metadata.namespace}}:{{p.metadata.name}}</mat-button-toggle>
+    </mat-button-toggle-group>
+</div>
+
+<div class="networkpolicy-container">
+    <mat-button-toggle-group name="fontStyle" aria-label="Font Style" [multiple]="true" (valueChange)="updateFiltering()" [(value)]="selectedNetworkPolicies" >
+        <mat-button-toggle class="card" *ngFor="let np of filteredNetworkPolicies" [value]="np">{{np.metadata.namespace}}:{{np.metadata.name}}</mat-button-toggle>
+    </mat-button-toggle-group>
+</div>

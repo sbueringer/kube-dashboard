@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ~/.nvm/nvm.sh
+
 # Build angular
 ng build
 
@@ -7,7 +9,7 @@ ng build
 rm -rf statik
 
 # generate binary package
-static -src=dist/kube-dashboard
+statik -src=dist/kube-dashboard
 
 # rebuild binary
 go build -o kube-dashboard main.go

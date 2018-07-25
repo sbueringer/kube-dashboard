@@ -235,8 +235,9 @@
                     <ngx-mat-select-search placeholderLabel="Filter" noEntriesFoundLabel="No matches found"
                                            [formControl]="roleBindingRuleFilterCtrl">
                     </ngx-mat-select-search>
-                    <mat-optgroup *ngFor="let rbr of selectFilteredNamespacesRoleBindingRules | async" [label]="rbr.namespace">
-                        <mat-option *ngFor="let rr of rbr.roleRules" [value]="rr">
+                    <mat-optgroup *ngFor="let rbr of selectFilteredNamespacesRoleBindingRules | async"
+                                  [label]="rbr.namespace">
+                        <mat-option *ngFor="let rr of rbr.roleBindingRules" [value]="rr">
                         {{rr.rule.display}}
                         </mat-option>
                     </mat-optgroup>
@@ -248,7 +249,8 @@
         </mat-grid-tile-header>
 
         <mat-accordion [multi]="true" class="rules-panel">
-            <mat-expansion-panel [expanded]="true" [hideToggle]="true" *ngFor="let nrr of visibleNamespacedRoleBindingRules"
+            <mat-expansion-panel [expanded]="true" [hideToggle]="true"
+                                 *ngFor="let nrr of visibleNamespacedRoleBindingRules"
                                  class="rules-expansion-panel">
                 <mat-expansion-panel-header>
                     <mat-panel-title>
@@ -260,7 +262,7 @@
                 </mat-expansion-panel-header>
                 <mat-action-row>
                     <mat-list class="rules-list">
-                        <mat-list-item *ngFor="let rr of nrr.roleRules; last as last">
+                        <mat-list-item *ngFor="let rr of nrr.roleBindingRules; last as last">
                         {{rr.rule.display}}
                             <mat-divider [inset]="true" *ngIf="!last"></mat-divider>
                         </mat-list-item>
@@ -270,3 +272,4 @@
         </mat-accordion>
     </mat-grid-tile>
 </mat-grid-list>
+

@@ -2,12 +2,12 @@ import {NgModule} from '@angular/core';
 import {RouterModule, Routes} from '@angular/router';
 
 import {RbacComponent} from "./rbac/rbac.component";
-import {PriorityComponent} from "./priority/priority.component";
+import {NetworkPolicyComponent} from "./networkpolicy/network-policy.component";
 
 const routes: Routes = [
-  { path: '', redirectTo: '/rbac', pathMatch: 'full' },
+  { path: '', redirectTo: '/netpol', pathMatch: 'full' },
   { path: 'rbac', component: RbacComponent },
-  { path: 'priority', component: PriorityComponent },
+  { path: 'netpol', component: NetworkPolicyComponent },
 ];
 
 @NgModule({
