@@ -34,7 +34,7 @@ export class KubeService {
     getNetPol(): Observable<NetPol> {
         return this.http.get<NetPol>(this.backendUrl+"/netpol")
             .pipe(
-                catchError(this.handleError('getNetPol', new RBAC()))
+                catchError(this.handleError('getNetPol', new NetPol()))
             );
     }
 
